@@ -1,97 +1,134 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Kenson Investment
 
-# Getting Started
+A cross-platform mobile investment management app built with **React Native** (iOS & Android). It gives users a clean, intuitive interface to track their portfolio, manage deposits and withdrawals, view monthly statements, earn referral rewards, and access financial education — all from one place.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## Features
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- **Authentication** — Splash, Login, Register, Forgot Password, OTP verification, and Reset Password flows
+- **Home Dashboard** — Animated portfolio value counter, bar chart performance overview, and quick-action shortcuts
+- **Portfolio** — Real-time portfolio breakdown with skeleton loading states
+- **Deposits & Withdrawals** — Simple forms to move funds in and out
+- **All Activity** — Full transaction history in one scrollable list
+- **Monthly Statement** — Period-by-period statement view
+- **Referral Program** — Shareable referral link and reward tracking
+- **Education** — In-app financial learning resources
+- **Notifications** — Push notification inbox
+- **Profile & Settings** — Edit profile, change password, contact support, privacy policy, and terms of service
+- **Drawer + Tab Navigation** — Smooth gesture-driven navigation powered by React Navigation
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
-```sh
-# Using npm
-npm start
+## Tech Stack
 
-# OR using Yarn
-yarn start
-```
+| Layer | Library |
+|---|---|
+| Framework | React Native 0.85 (New Architecture) |
+| Language | TypeScript 5 |
+| Navigation | React Navigation v7 (Stack, Drawer, Bottom Tabs) |
+| State | Redux Toolkit + AsyncStorage |
+| UI / Icons | Vector Icons (Ionicons, Material Design) |
+| Animations | React Native Reanimated 4 + Animated API |
+| Media | React Native Video |
+| Gestures | React Native Gesture Handler |
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## Getting Started
 
-### Android
+### Prerequisites
 
-```sh
-# Using npm
-npm run android
+- Node >= 22.11.0
+- Xcode (for iOS)
+- Android Studio (for Android)
+- CocoaPods (for iOS)
 
-# OR using Yarn
-yarn android
+### Install
+
+```bash
+git clone https://github.com/<your-username>/kenson-investment.git
+cd kenson-investment
+npm install
 ```
 
 ### iOS
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+```bash
+cd ios && pod install && cd ..
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Android
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```bash
+npm run android
+```
 
-## Step 3: Modify your app
+### Start Metro
 
-Now that you have successfully run the app, let's make changes!
+```bash
+npm start
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+---
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Project Structure
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+```
+src/
+├── assets/          # Images, fonts, and static files
+├── components/      # Reusable UI components (Input, Header, BarChart, Skeleton…)
+├── config/          # Environment config
+├── constants/       # Routes, API endpoints, storage keys
+├── data/            # Static datasets (e.g. location data)
+├── hooks/           # Custom React hooks
+├── navigation/      # Root, Auth, Main, Drawer, and Tab navigators
+├── screens/         # One folder per screen group
+├── services/        # API, Auth, and Pexels service layers
+├── store/           # Redux store and slices
+├── theme/           # Colors, typography, and spacing tokens
+├── types/           # Shared TypeScript types
+└── utils/           # Formatters, validators, helpers
+```
 
-## Congratulations! :tada:
+---
 
-You've successfully run and modified your React Native App. :partying_face:
+## Environment Variables
 
-### Now what?
+Create a `.env` file in the project root and fill in the required values (see [src/config/env.ts](src/config/env.ts) for the full list):
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+```env
+API_BASE_URL=https://your-api.example.com
+PEXELS_API_KEY=your_pexels_key
+```
 
-# Troubleshooting
+> Never commit `.env` to version control.
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+---
 
-# Learn More
+## Scripts
 
-To learn more about React Native, take a look at the following resources:
+| Command | Description |
+|---|---|
+| `npm start` | Start Metro bundler |
+| `npm run ios` | Run on iOS simulator |
+| `npm run android` | Run on Android emulator |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run Jest test suite |
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+---
+
+## Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m "feat: add your feature"`
+4. Push: `git push origin feature/your-feature`
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is licensed under the MIT License.
