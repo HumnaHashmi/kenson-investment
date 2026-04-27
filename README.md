@@ -1,6 +1,37 @@
 # Kenson Investment
 
-A cross-platform mobile investment management app built with **React Native** (iOS & Android). It gives users a clean, intuitive interface to track their portfolio, manage deposits and withdrawals, view monthly statements, earn referral rewards, and access financial education — all from one place.
+> **Smart investing, simplified.** A mobile-first investment platform that puts your full financial picture in your pocket.
+
+---
+
+## About
+
+**Kenson Investment** is a React Native mobile application designed to make personal investment management straightforward and transparent. Whether you're a first-time investor or tracking an established portfolio, the app gives you real-time visibility into your wealth — with clear charts, instant transaction history, and a secure account experience — all from your iOS or Android device.
+
+The app opens with an elegant three-slide onboarding flow that introduces its three core promises:
+
+- **Track Your Investments** — Monitor portfolio performance in real-time with detailed analytics and smart insights.
+- **Grow Your Wealth** — Maximize returns with expert-guided investment plans and profit-tracking tools.
+- **Safe & Secure** — Bank-grade security with transparent reporting keeps your assets protected.
+
+Once signed in, users land on a dashboard that animates their total portfolio value in real time, surfaces quick stats (total profit, active plans, and returns), and renders a bar chart of recent performance — all built to load instantly with skeleton screens so the experience never feels slow.
+
+From there, every core feature is one tap away through a bottom tab and side drawer navigation:
+
+| Screen | What it does |
+|---|---|
+| **Home** | Animated portfolio value, bar chart overview, quick-action shortcuts |
+| **Portfolio** | Line, bar, and pie charts broken down by year and asset category |
+| **Deposits** | Full deposit history with status badges, search, and receipt downloads |
+| **Withdrawals** | Withdrawal requests and transaction status tracking |
+| **All Activity** | Unified feed of every transaction across the account |
+| **Monthly Statement** | Period-by-period financial statements |
+| **Referral** | Shareable referral link with reward and earnings tracking |
+| **Education** | In-app financial learning content |
+| **Notifications** | Inbox for account alerts and updates |
+| **Profile & Settings** | Edit profile, change password, contact support, privacy policy, and terms |
+
+The project is built on **React Native 0.85** with TypeScript throughout, Redux Toolkit for global state, React Navigation v7 for routing, and Reanimated 4 for smooth, native-thread animations.
 
 ---
 
