@@ -16,8 +16,10 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ naviga
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (password.length < 8) e.password = 'Minimum 8 characters';
-    if (password !== confirm) e.confirm = 'Passwords do not match';
+    if (!password) e.password = 'Password is required';
+    else if (password.length < 8) e.password = 'Minimum 8 characters';
+    if (!confirm) e.confirm = 'Confirm password is required';
+    else if (password !== confirm) e.confirm = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };

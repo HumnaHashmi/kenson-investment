@@ -18,9 +18,11 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) =>
     const e: Record<string, string> = {};
     if (!form.fullName.trim()) e.fullName = 'Full name is required';
     if (!form.email.trim()) e.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Please enter a valid email address';
     if (!form.password) e.password = 'Password is required';
     else if (form.password.length < 8) e.password = 'Minimum 8 characters';
-    if (form.password !== form.confirm) e.confirm = 'Passwords do not match';
+    if (!form.confirm) e.confirm = 'Confirm password is required';
+    else if (form.password !== form.confirm) e.confirm = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };

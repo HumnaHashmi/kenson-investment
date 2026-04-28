@@ -60,7 +60,8 @@ export const ChangePasswordScreen: React.FC = () => {
     const e: Record<string, string> = {};
     if (!form.current) e.current = 'Required';
     if (form.newPass.length < 8) e.newPass = 'Minimum 8 characters';
-    if (form.newPass !== form.confirm) e.confirm = 'Passwords do not match';
+    if (!form.confirm) e.confirm = 'Confirm new password is required';
+    else if (form.newPass !== form.confirm) e.confirm = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };

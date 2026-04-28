@@ -84,5 +84,5 @@ const styles = StyleSheet.create({
     width: 44, height: 36, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  iconWrapActive: { backgroundColor: colors.primary + '14' },
+  iconWrapActive: {},
 });
