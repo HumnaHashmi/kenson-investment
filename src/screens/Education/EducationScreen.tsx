@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, StatusBar, Dimensions, ActivityIndicator, TextInput,
-  PanResponder, Animated,
+  PanResponder, Animated, useWindowDimensions,
 } from 'react-native';
 import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video';
+import Orientation from 'react-native-orientation-locker';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -105,16 +106,20 @@ interface PlayerProps {
   onSelectVideo: (video: PexelsVideo, index: number) => void;
 }
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const PLAYER_H      = SCREEN_WIDTH * 9 / 16;
 
 const VideoPlayerModal: React.FC<PlayerProps> = ({
   video, title, accentColor, allVideos, currentIndex, folderTitle, onClose, onSelectVideo,
 }) => {
-  const videoRef               = useRef<VideoRef>(null);
-  const hideTimer              = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const seekBarRef             = useRef<View>(null);
-  const controlsOpacity        = useRef(new Animated.Value(1)).current;
+  const videoRef        = useRef<VideoRef>(null);
+  const hideTimer       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekBarRef      = useRef<View>(null);
+  const controlsOpacity = useRef(new Animated.Value(1)).current;
+
+  // Refs keep latest values accessible inside pan responder without stale closures
+  const durationRef = useRef(0);
+  const currentRef  = useRef(0);
+  const seekingRef  = useRef(false);
+  const pausedRef   = useRef(false);
 
   const [paused,      setPaused]      = useState(false);
   const [buffering,   setBuf]         = useState(true);
@@ -122,24 +127,53 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
   const [ended,       setEnded]       = useState(false);
   const [duration,    setDur]         = useState(0);
   const [current,     setCur]         = useState(0);
-  const [fullscreen,  setFullscreen]  = useState(false);
-  const [seeking,     setSeeking]     = useState(false);
-  const [controlsVis, setControlsVis] = useState(true);
+  const [controlsVis,  setControlsVis]  = useState(true);
+  const [isLandscape,  setIsLandscape]  = useState(false);
 
-  const videoUrl = pickVideoUrl(video);
+  const { width: W, height: H } = useWindowDimensions();
+
   const progress = duration > 0 ? current / duration : 0;
 
-  // Auto-hide controls after 3 s
+  // Lock to portrait on open; listen for actual device rotation to sync state; unlock on close
+  useEffect(() => {
+    Orientation.lockToPortrait();
+    Orientation.addOrientationListener(orientation => {
+      setIsLandscape(orientation === 'LANDSCAPE-LEFT' || orientation === 'LANDSCAPE-RIGHT');
+    });
+    return () => {
+      Orientation.removeOrientationListener(() => {});
+      Orientation.unlockAllOrientations();
+    };
+  }, []);
+
+  // Reset all playback state when the video changes
+  useEffect(() => {
+    setPaused(false);
+    pausedRef.current = false;
+    setBuf(true);
+    setError(false);
+    setEnded(false);
+    setDur(0);
+    setCur(0);
+    durationRef.current = 0;
+    currentRef.current  = 0;
+    setControlsVis(true);
+    controlsOpacity.setValue(1);
+  }, [video.id, controlsOpacity]);
+
+  // Cleanup timer on unmount
+  useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+
   const scheduleHide = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
-      if (!paused) {
+      if (!pausedRef.current) {
         Animated.timing(controlsOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(
           () => setControlsVis(false),
         );
       }
     }, 3000);
-  }, [paused, controlsOpacity]);
+  }, [controlsOpacity]);
 
   const showControls = useCallback(() => {
     setControlsVis(true);
@@ -147,11 +181,20 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
     scheduleHide();
   }, [controlsOpacity, scheduleHide]);
 
-  useEffect(() => { scheduleHide(); }, [scheduleHide]);
-  useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+  const toggleOrientation = useCallback(() => {
+    if (isLandscape) {
+      Orientation.lockToPortrait();
+      setIsLandscape(false);
+    } else {
+      Orientation.lockToLandscapeLeft();
+      setIsLandscape(true);
+    }
+    showControls();
+  }, [isLandscape, showControls]);
 
-  // Pause → always show controls
+  // When paused, always keep controls visible
   useEffect(() => {
+    pausedRef.current = paused;
     if (paused) {
       if (hideTimer.current) clearTimeout(hideTimer.current);
       setControlsVis(true);
@@ -163,65 +206,79 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
 
   const onLoad = useCallback((d: OnLoadData) => {
     setDur(d.duration);
+    durationRef.current = d.duration;
     setBuf(false);
   }, []);
 
   const onProgress = useCallback((d: OnProgressData) => {
-    if (!seeking) setCur(d.currentTime);
-  }, [seeking]);
+    if (!seekingRef.current) {
+      currentRef.current = d.currentTime;
+      setCur(d.currentTime);
+    }
+  }, []);
 
   const seek = useCallback((secs: number) => {
-    const clamped = Math.max(0, Math.min(secs, duration));
+    const clamped = Math.max(0, Math.min(secs, durationRef.current));
     videoRef.current?.seek(clamped);
+    currentRef.current = clamped;
     setCur(clamped);
     showControls();
-  }, [duration, showControls]);
+  }, [showControls]);
 
-  const skipBack    = () => seek(current - 10);
-  const skipForward = () => seek(current + 10);
-  const replay      = () => { setEnded(false); setPaused(false); seek(0); };
+  const skipBack    = useCallback(() => seek(currentRef.current - 10), [seek]);
+  const skipForward = useCallback(() => seek(currentRef.current + 10), [seek]);
+  const replay      = useCallback(() => { setEnded(false); setPaused(false); seek(0); }, [seek]);
 
-  // Seek bar pan responder
+  // Pan responder uses refs — no stale closure on duration/current
   const seekPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: (e) => {
-        setSeeking(true);
-        // immediate seek on touch
+        seekingRef.current = true;
         seekBarRef.current?.measure((_x, _y, width, _h, pageX) => {
-          const ratio = Math.max(0, Math.min(1, (e.nativeEvent.pageX - pageX) / width));
-          setCur(ratio * duration);
+          const ratio   = Math.max(0, Math.min(1, (e.nativeEvent.pageX - pageX) / width));
+          const newTime = ratio * durationRef.current;
+          currentRef.current = newTime;
+          setCur(newTime);
         });
       },
       onPanResponderMove: (e) => {
         seekBarRef.current?.measure((_x, _y, width, _h, pageX) => {
-          const ratio = Math.max(0, Math.min(1, (e.nativeEvent.pageX - pageX) / width));
-          setCur(ratio * duration);
+          const ratio   = Math.max(0, Math.min(1, (e.nativeEvent.pageX - pageX) / width));
+          const newTime = ratio * durationRef.current;
+          currentRef.current = newTime;
+          setCur(newTime);
         });
       },
       onPanResponderRelease: (e) => {
         seekBarRef.current?.measure((_x, _y, width, _h, pageX) => {
-          const ratio = Math.max(0, Math.min(1, (e.nativeEvent.pageX - pageX) / width));
-          const newTime = ratio * duration;
+          const ratio   = Math.max(0, Math.min(1, (e.nativeEvent.pageX - pageX) / width));
+          const newTime = ratio * durationRef.current;
           videoRef.current?.seek(newTime);
+          currentRef.current = newTime;
           setCur(newTime);
-          setSeeking(false);
+          seekingRef.current = false;
         });
       },
     }),
   ).current;
 
-  const playerStyle = fullscreen
-    ? { width: SCREEN_HEIGHT, height: SCREEN_WIDTH, transform: [{ rotate: '90deg' }] }
-    : { width: SCREEN_WIDTH, height: PLAYER_H };
+  const videoUrl = pickVideoUrl(video);
+  const [listOpen, setListOpen] = useState(false);
 
   return (
-    <Modal visible animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal
+      visible
+      animationType="slide"
+      statusBarTranslucent
+      supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
+      onRequestClose={onClose}>
+
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       <View style={ytStyles.root}>
 
-        {/* ════ VIDEO PLAYER ════ */}
-        <View style={[ytStyles.playerBox, playerStyle]}>
+        {/* ════ VIDEO — fills entire screen ════ */}
+        <View style={[ytStyles.playerBox, { width: W, height: H }]}>
           {!error && (
             <Video
               ref={videoRef}
@@ -239,14 +296,12 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
             />
           )}
 
-          {/* buffering spinner */}
           {buffering && !error && (
             <View style={ytStyles.centerOverlay} pointerEvents="none">
               <ActivityIndicator size="large" color="#fff" />
             </View>
           )}
 
-          {/* error */}
           {error && (
             <View style={ytStyles.centerOverlay}>
               <Ionicons name="alert-circle-outline" size={50} color="#fff" />
@@ -254,29 +309,34 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
             </View>
           )}
 
-          {/* tap area → toggle controls */}
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={controlsVis ? scheduleHide : showControls}
-          />
+          {/* Tap area — only when list is closed */}
+          {!listOpen && (
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => controlsVis ? scheduleHide() : showControls()}
+            />
+          )}
 
-          {/* ── YouTube-style controls overlay ── */}
+          {/* Controls overlay */}
           {controlsVis && !error && (
             <Animated.View style={[ytStyles.controlsOverlay, { opacity: controlsOpacity }]}>
 
-              {/* top bar: back + title */}
+              {/* Top bar: back + title + rotate + list toggle */}
               <View style={ytStyles.topBar}>
                 <TouchableOpacity onPress={onClose} hitSlop={10}>
                   <Ionicons name="chevron-down" size={26} color="#fff" />
                 </TouchableOpacity>
                 <Text style={ytStyles.topTitle} numberOfLines={1}>{title}</Text>
-                <TouchableOpacity onPress={() => { setFullscreen(f => !f); showControls(); }} hitSlop={10}>
-                  <Ionicons name={fullscreen ? 'contract' : 'expand'} size={22} color="#fff" />
+                <TouchableOpacity onPress={toggleOrientation} hitSlop={10}>
+                  <Ionicons name={isLandscape ? 'phone-portrait-outline' : 'phone-landscape-outline'} size={22} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setListOpen(o => !o); showControls(); }} hitSlop={10}>
+                  <Ionicons name="list" size={22} color="#fff" />
                 </TouchableOpacity>
               </View>
 
-              {/* centre row: -10 / play-pause / +10 */}
+              {/* Centre: skip-back / play-pause / skip-forward */}
               <View style={ytStyles.centreRow}>
                 <TouchableOpacity style={ytStyles.skipBtn} onPress={skipBack} hitSlop={10}>
                   <Ionicons name="play-back" size={28} color="#fff" />
@@ -301,61 +361,67 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* bottom bar: time + seek bar + duration */}
+              {/* Bottom bar */}
               <View style={ytStyles.bottomBar}>
                 <Text style={ytStyles.timeText}>{fmtDuration(current)}</Text>
-
-                {/* seek bar */}
-                <View
-                  ref={seekBarRef}
-                  style={ytStyles.seekTrack}
-                  {...seekPan.panHandlers}>
-                  {/* buffered bg */}
+                <View ref={seekBarRef} style={ytStyles.seekTrack} {...seekPan.panHandlers}>
                   <View style={ytStyles.seekBg} />
-                  {/* played */}
                   <View style={[ytStyles.seekFill, { width: `${progress * 100}%`, backgroundColor: accentColor }]} />
-                  {/* thumb */}
                   <View style={[ytStyles.seekThumb, { left: `${progress * 100}%`, backgroundColor: accentColor }]} />
                 </View>
-
                 <Text style={ytStyles.timeText}>{fmtDuration(duration)}</Text>
               </View>
 
             </Animated.View>
           )}
-        </View>
 
-        {/* ════ INFO PANEL (below player) ════ */}
-        <View style={ytStyles.infoPanel}>
-          <Text style={ytStyles.infoTitle} numberOfLines={2}>{title}</Text>
-          <Text style={[ytStyles.infoMeta, { color: accentColor }]}>
-            {fmtDuration(video.duration)} · {video.width}×{video.height}
-          </Text>
-
-          <View style={ytStyles.divider} />
-
-          {/* Up next list */}
-          <Text style={ytStyles.sectionHead}>Up next</Text>
-          {allVideos.map((v, i) => {
-            if (i === currentIndex) return null;
-            const nextTitle = `${folderTitle} — Video ${i + 1}`;
-            return (
+          {/* ── Up-next slide-up panel ── */}
+          {listOpen && (
+            <>
               <TouchableOpacity
-                key={v.id}
-                style={ytStyles.upNextRow}
-                activeOpacity={0.75}
-                onPress={() => onSelectVideo(v, i)}>
-                <View style={[ytStyles.upNextThumb, { backgroundColor: accentColor + '20' }]}>
-                  <Ionicons name="play-circle" size={26} color={accentColor} />
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={() => setListOpen(false)}
+              />
+              <View style={ytStyles.listPanel}>
+                <View style={ytStyles.listHandle} />
+                <View style={ytStyles.listHeader}>
+                  <Text style={ytStyles.listHeading}>Up Next</Text>
+                  <TouchableOpacity onPress={() => setListOpen(false)} hitSlop={10}>
+                    <Ionicons name="close" size={22} color="#fff" />
+                  </TouchableOpacity>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={ytStyles.upNextTitle} numberOfLines={2}>{nextTitle}</Text>
-                  <Text style={ytStyles.upNextMeta}>⏱ {fmtDuration(v.duration)}</Text>
-                </View>
-             
-              </TouchableOpacity>
-            );
-          })}
+                <FlatList
+                  data={allVideos}
+                  keyExtractor={v => String(v.id)}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item, index }) => {
+                    const isActive = index === currentIndex;
+                    const nextTitle = `${folderTitle} — Video ${index + 1}`;
+                    return (
+                      <TouchableOpacity
+                        style={[ytStyles.upNextRow, isActive && ytStyles.upNextRowActive]}
+                        activeOpacity={0.75}
+                        onPress={() => { onSelectVideo(item, index); setListOpen(false); }}>
+                        <View style={[ytStyles.upNextThumb, { backgroundColor: accentColor + '25' }]}>
+                          {isActive
+                            ? <Ionicons name="volume-high" size={18} color={accentColor} />
+                            : <Ionicons name="play-circle" size={24} color={accentColor} />}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[ytStyles.upNextTitle, isActive && { color: accentColor }]} numberOfLines={2}>
+                            {nextTitle}
+                          </Text>
+                          <Text style={ytStyles.upNextMeta}>⏱ {fmtDuration(item.duration)}</Text>
+                        </View>
+                        {isActive && <Ionicons name="checkmark-circle" size={16} color={accentColor} />}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              </View>
+            </>
+          )}
         </View>
 
       </View>
@@ -635,7 +701,7 @@ const styles = StyleSheet.create({
 
 const ytStyles = StyleSheet.create({
   root:         { flex: 1, backgroundColor: '#000' },
-  playerBox:    { backgroundColor: '#000', overflow: 'hidden' },
+  playerBox:    { flex: 1, backgroundColor: '#000', overflow: 'hidden' },
 
   // Spinner / error centred on player
   centerOverlay: {
@@ -699,16 +765,33 @@ const ytStyles = StyleSheet.create({
     top: 3, borderWidth: 2, borderColor: '#fff',
   },
 
-  // Info panel below player
-  infoPanel:    { flex: 1, backgroundColor: colors.background, padding: spacing.base },
-  infoTitle:    { fontSize: fontSizes.base, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
-  infoMeta:     { fontSize: fontSizes.xs, fontWeight: '600', marginBottom: spacing.md },
-  divider:      { height: 1, backgroundColor: colors.divider, marginVertical: spacing.sm },
-  sectionHead:  { fontSize: fontSizes.sm, fontWeight: '700', color: colors.text.primary, marginBottom: spacing.sm },
-  upNextRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  upNextThumb:  { width: 72, height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  upNextTitle:  { fontSize: fontSizes.sm, fontWeight: '600', color: colors.text.primary },
-  upNextMeta:     { fontSize: fontSizes.xs, color: colors.text.secondary, marginTop: 3 },
+  // Up-next slide-up panel
+  listPanel: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    maxHeight: '65%', paddingBottom: 30,
+  },
+  listHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    alignSelf: 'center', marginTop: 10, marginBottom: 4,
+  },
+  listHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.base, paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  listHeading: { fontSize: fontSizes.base, fontWeight: '800', color: '#fff' },
+  upNextRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingHorizontal: spacing.base, paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  upNextRowActive: { backgroundColor: 'rgba(255,255,255,0.05)' },
+  upNextThumb:  { width: 56, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  upNextTitle:  { fontSize: fontSizes.sm, fontWeight: '600', color: '#fff' },
+  upNextMeta:   { fontSize: fontSizes.xs, color: 'rgba(255,255,255,0.5)', marginTop: 3 },
   upNextBadge:    { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 6 },
   upNextBadgeTxt: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });
