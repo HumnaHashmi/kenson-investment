@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { DrawerContentScrollView, type DrawerContentComponentProps } from '@react-navigation/drawer';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { colors, fontSizes, spacing } from '../theme';
 import { ROUTES } from '../constants/routes';
+import { useProfile } from '../store/ProfileContext';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -22,6 +23,7 @@ export const CustomDrawer: React.FC<DrawerContentComponentProps> = props => {
   const { navigation, state } = props;
   const activeRoute = state.routes[state.index]?.name;
   const [logoutModal, setLogoutModal] = useState(false);
+  const { photoUri } = useProfile();
 
   const handleLogout = () => {
     setLogoutModal(false);
@@ -33,7 +35,9 @@ export const CustomDrawer: React.FC<DrawerContentComponentProps> = props => {
       {/* Profile section */}
       <View style={styles.profile}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>JD</Text>
+          {photoUri
+            ? <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+            : <Text style={styles.avatarText}>JD</Text>}
         </View>
         <Text style={styles.name}>John Doe</Text>
         <Text style={styles.email}>john.doe@email.com</Text>
@@ -110,6 +114,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md, borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)',
   },
   avatarText: { fontSize: fontSizes.xl, fontWeight: '800', color: '#fff' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 32, resizeMode: 'cover' },
   name: { fontSize: fontSizes.lg, fontWeight: '700', color: '#fff' },
   email: { fontSize: fontSizes.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   balanceBadge: {

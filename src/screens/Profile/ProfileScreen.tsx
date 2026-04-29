@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, FlatList, Pressable,
 } from 'react-native';
+import { ProfileAvatar } from './components/ProfileAvatar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@react-native-vector-icons/ionicons';
@@ -237,9 +238,7 @@ export const ProfileScreen: React.FC = () => {
         {/* Profile Hero */}
         <View style={styles.hero}>
           <View style={styles.heroDecor} />
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          <ProfileAvatar initials={initials} editable={editing} />
           <Text style={styles.name}>{form.firstName} {form.lastName}</Text>
           <Text style={styles.emailLabel}>{form.email}</Text>
           <View style={styles.memberBadge}>
@@ -521,17 +520,7 @@ const styles = StyleSheet.create({
     width: 200, height: 200, borderRadius: 100,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  avatar: {
-    width: 84, height: 84, borderRadius: 42,
-    backgroundColor: colors.accent,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: 'rgba(255,255,255,0.25)',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5, shadowRadius: 12, elevation: 8,
-  },
-  avatarText: { fontSize: fontSizes['2xl'], fontWeight: '800', color: '#fff' },
-  name: { fontSize: fontSizes.xl, fontWeight: '800', color: '#fff', marginTop: spacing.md, letterSpacing: -0.3 },
+name: { fontSize: fontSizes.xl, fontWeight: '800', color: '#fff', marginTop: spacing.md, letterSpacing: -0.3 },
   emailLabel: { fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
   memberBadge: {
     backgroundColor: 'rgba(240,165,0,0.2)', borderRadius: 20,
