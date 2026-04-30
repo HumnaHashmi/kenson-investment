@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Pressable, ScrollView, Share } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Share, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { Skeleton } from '../../components/common/Skeleton';
 import { EmptyState } from '../../components/common/EmptyState';
 import { colors, fontSizes, spacing } from '../../theme';
 import Ionicons from '@react-native-vector-icons/ionicons';
+import { generatePDF } from 'react-native-html-to-pdf';
 
 const MonthlyStatementScreenSkeleton: React.FC = () => (
   <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -15,7 +16,6 @@ const MonthlyStatementScreenSkeleton: React.FC = () => (
         <Skeleton width={130} height={11} borderRadius={4} style={skStyles.skLight} />
       </View>
     </View>
-    {/* Filter section */}
     <View style={styles.filterSection}>
       <Skeleton width={40} height={10} borderRadius={4} style={{ marginBottom: spacing.sm }} />
       <View style={[styles.filterRow]}>
@@ -30,7 +30,6 @@ const MonthlyStatementScreenSkeleton: React.FC = () => (
         ))}
       </View>
     </View>
-    {/* List items */}
     <View style={{ padding: spacing.base, gap: spacing.sm }}>
       {[0, 1, 2, 3, 4].map(i => (
         <View key={i} style={[styles.item]}>
@@ -76,84 +75,92 @@ const STATEMENTS: Statement[] = [
   { id: 'STMT-2022-03', year: '2022', month: 'Mar', label: 'March 2022',     fileName: 'Statement_Mar_2022.pdf' },
 ];
 
-const StatementDownloadSheet: React.FC<{ statement: Statement; onClose: () => void }> = ({ statement, onClose }) => {
-  const handleShare = async () => {
-    const text = [
-      '===== Kenson Investment =====',
-      'Monthly Statement',
-      '',
-      `Statement ID : ${statement.id}`,
-      `Period       : ${statement.label}`,
-      `File         : ${statement.fileName}`,
-      '',
-      'For queries contact support@kensoninvestment.com',
-    ].join('\n');
-    await Share.share({ message: text, title: statement.fileName });
-  };
+const buildPdfHtml = (s: Statement) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #1a1a2e; background: #fff; padding: 48px; }
+    .header { display: flex; align-items: center; border-bottom: 3px solid #1a3c8f; padding-bottom: 20px; margin-bottom: 32px; }
+    .logo-circle { width: 48px; height: 48px; background: #1a3c8f; border-radius: 12px; margin-right: 16px; flex-shrink: 0; }
+    .company-name { font-size: 22px; font-weight: 800; color: #1a3c8f; }
+    .company-sub { font-size: 12px; color: #666; margin-top: 3px; }
+    .badge { display: inline-block; background: #1a3c8f; color: #fff; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 4px 12px; margin-bottom: 12px; letter-spacing: 1px; }
+    h1 { font-size: 20px; font-weight: 800; color: #1a1a2e; margin-bottom: 28px; }
+    .card { background: #f5f7ff; border-radius: 12px; padding: 0 20px; margin-bottom: 28px; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid #dde2f0; }
+    .row:last-child { border-bottom: none; }
+    .lbl { font-size: 13px; color: #666; }
+    .val { font-size: 13px; font-weight: 700; color: #1a1a2e; }
+    .footer { font-size: 11px; color: #aaa; text-align: center; margin-top: 48px; border-top: 1px solid #e5e8f0; padding-top: 18px; line-height: 1.7; }
+    .footer strong { color: #555; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-circle"></div>
+    <div>
+      <div class="company-name">Kenson Investment</div>
+      <div class="company-sub">Official Monthly Statement</div>
+    </div>
+  </div>
 
-  return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={sheetStyles.overlay} onPress={onClose} />
-      <View style={sheetStyles.sheet}>
-        <View style={sheetStyles.header}>
-          <Text style={sheetStyles.title}>Monthly Statement</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={8}>
-            <Ionicons name="close" size={22} color={colors.text.primary} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={sheetStyles.body} showsVerticalScrollIndicator={false}>
-          <View style={sheetStyles.logoRow}>
-            <View style={sheetStyles.logoIcon}>
-              <Ionicons name="business" size={20} color="#fff" />
-            </View>
-            <View>
-              <Text style={sheetStyles.company}>Kenson Investment</Text>
-              <Text style={sheetStyles.companyLabel}>Official Monthly Statement</Text>
-            </View>
-          </View>
+  <div class="badge">STATEMENT</div>
+  <h1>${s.label} Account Statement</h1>
 
-          <View style={sheetStyles.fileBox}>
-            <Ionicons name="document-text" size={36} color={colors.primary} />
-            <Text style={sheetStyles.fileName}>{statement.fileName}</Text>
-            <Text style={sheetStyles.fileLabel}>{statement.label}</Text>
-          </View>
+  <div class="card">
+    <div class="row"><span class="lbl">Statement ID</span><span class="val">${s.id}</span></div>
+    <div class="row"><span class="lbl">Period</span><span class="val">${s.label}</span></div>
+    <div class="row"><span class="lbl">Year</span><span class="val">${s.year}</span></div>
+    <div class="row"><span class="lbl">Month</span><span class="val">${s.month}</span></div>
+    <div class="row"><span class="lbl">File Name</span><span class="val">${s.fileName}</span></div>
+    <div class="row"><span class="lbl">Generated On</span><span class="val">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
+  </div>
 
-          <View style={sheetStyles.detailsCard}>
-            {[
-              ['Statement ID', statement.id],
-              ['Period', statement.label],
-              ['Year', statement.year],
-              ['Month', statement.month],
-            ].map(([label, value]) => (
-              <View key={label} style={sheetStyles.row}>
-                <Text style={sheetStyles.rowLabel}>{label}</Text>
-                <Text style={sheetStyles.rowValue}>{value}</Text>
-              </View>
-            ))}
-          </View>
-
-          <Text style={sheetStyles.footer}>For queries contact support@kensoninvestment.com</Text>
-
-          <TouchableOpacity style={sheetStyles.shareBtn} onPress={handleShare}>
-            <Ionicons name="share-outline" size={18} color="#fff" />
-            <Text style={sheetStyles.shareBtnText}>Share Statement</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-};
+  <div class="footer">
+    This is an official statement from Kenson Investment.<br/>
+    For queries contact <strong>support@kensoninvestment.com</strong>
+  </div>
+</body>
+</html>
+`;
 
 export const MonthlyStatementScreen: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('Apr');
   const [selectedYear, setSelectedYear] = useState('2024');
   const [loading, setLoading] = useState(true);
-  const [activeStatement, setActiveStatement] = useState<Statement | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(t);
   }, []);
+
+  const handleDownload = async (item: Statement) => {
+    if (downloadingId) { return; }
+    setDownloadingId(item.id);
+    try {
+      const result = await generatePDF({
+        html: buildPdfHtml(item),
+        fileName: item.fileName.replace('.pdf', ''),
+        directory: 'Documents',
+      });
+
+      if (result.filePath) {
+        await Share.share({
+          url: `file://${result.filePath}`,
+          title: item.fileName,
+          message: `${item.label} Statement – Kenson Investment`,
+        });
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   if (loading) { return <MonthlyStatementScreenSkeleton />; }
 
@@ -161,7 +168,6 @@ export const MonthlyStatementScreen: React.FC = () => {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScreenHeader title="Monthly Statement" subtitle="Download your reports" />
 
-      {/* Year Filter */}
       <View style={styles.filterSection}>
         <Text style={styles.filterLabel}>Year</Text>
         <View style={styles.filterRow}>
@@ -188,26 +194,33 @@ export const MonthlyStatementScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* List */}
       <FlatList
         data={STATEMENTS.filter(s => s.year === selectedYear && s.month === selectedMonth)}
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <View style={styles.itemIcon}>
-              <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+        renderItem={({ item }) => {
+          const isDownloading = downloadingId === item.id;
+          return (
+            <View style={styles.item}>
+              <View style={styles.itemIcon}>
+                <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+              </View>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemId}>{item.id}</Text>
+                <Text style={styles.itemDate}>{item.label}</Text>
+                <Text style={styles.itemFile}>{item.fileName}</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.downloadBtn, isDownloading && styles.downloadBtnBusy]}
+                onPress={() => handleDownload(item)}
+                disabled={!!downloadingId}>
+                {isDownloading
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Ionicons name="cloud-download-outline" size={20} color="#fff" />}
+              </TouchableOpacity>
             </View>
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemId}>{item.id}</Text>
-              <Text style={styles.itemDate}>{item.label}</Text>
-              <Text style={styles.itemFile}>{item.fileName}</Text>
-            </View>
-            <TouchableOpacity style={styles.downloadBtn} onPress={() => setActiveStatement(item)}>
-              <Ionicons name="cloud-download-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        )}
+          );
+        }}
         ListEmptyComponent={
           <EmptyState
             icon="document-outline"
@@ -216,38 +229,9 @@ export const MonthlyStatementScreen: React.FC = () => {
           />
         }
       />
-
-      {activeStatement && (
-        <StatementDownloadSheet
-          statement={activeStatement}
-          onClose={() => setActiveStatement(null)}
-        />
-      )}
     </SafeAreaView>
   );
 };
-
-const sheetStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  title: { fontSize: fontSizes.base, fontWeight: '800', color: colors.text.primary },
-  body: { padding: spacing.base, paddingBottom: spacing['3xl'] },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xl },
-  logoIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  company: { fontSize: fontSizes.base, fontWeight: '800', color: colors.text.primary },
-  companyLabel: { fontSize: fontSizes.xs, color: colors.text.secondary, marginTop: 1 },
-  fileBox: { alignItems: 'center', backgroundColor: colors.background, borderRadius: 16, paddingVertical: spacing.xl, marginBottom: spacing.base, gap: spacing.sm },
-  fileName: { fontSize: fontSizes.sm, fontWeight: '700', color: colors.text.primary, textAlign: 'center' },
-  fileLabel: { fontSize: fontSizes.xs, color: colors.text.secondary },
-  detailsCard: { backgroundColor: colors.background, borderRadius: 16, paddingHorizontal: spacing.md, marginBottom: spacing.base },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  rowLabel: { fontSize: fontSizes.sm, color: colors.text.secondary },
-  rowValue: { fontSize: fontSizes.sm, fontWeight: '600', color: colors.text.primary },
-  footer: { fontSize: fontSizes.xs, color: colors.text.disabled, textAlign: 'center', marginBottom: spacing.xl },
-  shareBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
-  shareBtnText: { color: '#fff', fontWeight: '800', fontSize: fontSizes.base },
-});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
@@ -279,6 +263,7 @@ const styles = StyleSheet.create({
   itemFile: { fontSize: fontSizes.xs, color: colors.text.disabled, marginTop: 2 },
   downloadBtn: {
     width: 36, height: 36, borderRadius: 8,
-    backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
+  downloadBtnBusy: { opacity: 0.6 },
 });

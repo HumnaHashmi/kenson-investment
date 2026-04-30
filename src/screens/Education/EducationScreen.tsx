@@ -285,6 +285,7 @@ const VideoPlayerModal: React.FC<PlayerProps> = ({
               source={{ uri: videoUrl }}
               style={StyleSheet.absoluteFill}
               resizeMode="contain"
+              useTextureView={true}   // ← add this
               paused={paused}
               controls={false}
               repeat={false}
